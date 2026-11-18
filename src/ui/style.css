@@ -1,4 +1,4 @@
-:root { --fond: #f6efdc; --encre: #2f3a6b; }
+:root { color-scheme: light dark; --fond: #f6efdc; --encre: #2f3a6b; --carte: #fff; --bouton: #fffaf0; --bouton-ombre: #d9c9a3; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--fond); color: var(--encre); font-family: system-ui, sans-serif; touch-action: manipulation; }
 #app { min-height: 100%; }
@@ -6,7 +6,7 @@ html, body { margin: 0; height: 100%; background: var(--fond); color: var(--encr
 button { min-width: 48px; min-height: 48px; font: inherit; cursor: pointer; }
 .bouton-icone { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--encre); }
 .parent-btn { position: absolute; top: 12px; right: 12px; opacity: .5; }
-.carte { border: 4px solid var(--encre); border-radius: 28px; background: #fff; padding: 24px 40px; min-width: 200px; min-height: 200px; }
+.carte { border: 4px solid var(--encre); border-radius: 28px; background: var(--carte); padding: 24px 40px; min-width: 200px; min-height: 200px; }
 .parent { align-items: stretch; max-width: 480px; margin: 0 auto; justify-content: flex-start; }
 .parent .reponses { display: flex; gap: 12px; }
 .parent .reponses button { flex: 1; }
@@ -15,7 +15,7 @@ button { min-width: 48px; min-height: 48px; font: inherit; cursor: pointer; }
 /* Écran de jeu : barre d'icônes, plateau en bois, mascotte. */
 .jeu { justify-content: flex-start; gap: 12px; padding: 8px 12px 16px; overflow-x: clip; }
 .jeu .barre { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 720px; gap: 8px; }
-.jeu .barre .bouton-icone { width: 56px; height: 56px; background: #fffaf0; box-shadow: 0 2px 0 #d9c9a3; }
+.jeu .barre .bouton-icone { width: 56px; height: 56px; background: var(--bouton); box-shadow: 0 2px 0 var(--bouton-ombre); }
 .jeu .barre .bouton-icone svg { width: 32px; height: 32px; }
 .avancee { display: flex; gap: 2px; align-items: center; }
 .avancee span { display: block; line-height: 0; opacity: .3; filter: grayscale(1); transition: transform .3s, opacity .3s; }
@@ -31,7 +31,7 @@ button { min-width: 48px; min-height: 48px; font: inherit; cursor: pointer; }
 .plateau svg { width: 100%; height: 100%; display: block; }
 .case { transition: background-color .3s, box-shadow .3s; }
 .case.clair { background: #f0d9b5; }
-.case.fonce { background: #b58863; }
+.case.fonce { background: #a06a40; }
 .case.legale::after { content: ''; position: absolute; inset: calc(var(--c) * .36); border-radius: 50%; background: rgb(66 108 80 / .55); }
 .case.trajet { box-shadow: inset 0 0 0 calc(var(--c) * .5) rgb(255 220 90 / .55); }
 .etoile, .rocher, .anneau, .piece, .contour { pointer-events: none; }
@@ -60,6 +60,13 @@ button { min-width: 48px; min-height: 48px; font: inherit; cursor: pointer; }
 .pause { display: flex; flex-direction: column; align-items: center; gap: 24px; }
 .mascotte-pause { line-height: 0; }
 .bouton-continuer { width: 112px; height: 112px; border-radius: 50%; border: 0; background: #426c50; color: #fff; box-shadow: 0 6px 0 #2c4a36; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Sombre : page et boutons calmes, mais le plateau garde son bois (cases, bordure, pièces) tel quel. */
+@media (prefers-color-scheme: dark) {
+    :root { --fond: #2a2018; --encre: #f1e4cc; --carte: #3b2e22; --bouton: #4a3a2b; --bouton-ombre: #1c140d; }
+    .plateau { box-shadow: 0 0 0 6px #8a6038, 0 10px 24px rgb(0 0 0 / .5); }
+    .avancee span:not(.faite):not(.en-cours) { opacity: .45; }
+}
 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
