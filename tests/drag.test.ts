@@ -1,0 +1,119 @@
+// Repris d'Opencadkid (tests/drag.test.ts), sans le test des jeux propres à Kid.
+import { afterEach, expect, it, vi } from 'vitest';
+import { bindDragEnd, type DragHandle } from '../src/shell/drag';
+
+// Minimal test DOM, following the EventTarget fixtures used for activation.
+// Frames are explicit: no browser, timers, or DOM dependency is needed.
+class TestDocument extends EventTarget {
+    hidden = false;
+    private sequence = 0;
+    readonly frames = new Map<number, FrameRequestCallback>();
+    readonly defaultView = {
+        requestAnimationFrame: (callback: FrameRequestCallback): number => { const id = ++this.sequence; this.frames.set(id, callback); return id; },
+        cancelAnimationFrame: (id: number): void => { this.frames.delete(id); }
+    };
+    frame(): void { const batch = [...this.frames.values()]; this.frames.clear(); batch.forEach(callback => callback(16)); }
+}
+class TestClassList extends Set<string> {
+    remove(...tokens: string[]): void { tokens.forEach(token => this.delete(token)); }
+}
+class TestElement extends EventTarget {
+    isConnected = true;
+    style = { transform: '' };
+    classList = new TestClassList();
+    dataset: Record<string, string> = {};
+    captures = new Set<number>();
+    onclick: ((event: Event) => void) | null = null;
+    constructor(readonly ownerDocument: TestDocument) { super(); }
+    focus(): void { /* The fixture has no focus navigation. */ }
+    getBoundingClientRect(): { x: number; y: number; width: number; height: number; left: number; top: number; right: number; bottom: number } {
+        return { x: 0, y: 0, width: 300, height: 300, left: 0, top: 0, right: 300, bottom: 300 };
+    }
+    hasPointerCapture(pointer: number): boolean { return this.captures.has(pointer); }
+    setPointerCapture(pointer: number): void { this.captures.add(pointer); }
+    releasePointerCapture(pointer: number): void { this.captures.delete(pointer); }
+    get element(): HTMLElement { return this as unknown as HTMLElement; }
+}
+function send(target: EventTarget, type: string, overrides = {}): void {
+    target.dispatchEvent(Object.assign(new Event(type, { bubbles: true, cancelable: true }), { pointerId: 1, isPrimary: true, button: 0, clientX: 20, clientY: 20 }, overrides));
+}
+function fixture(separateCapture = false) {
+    const document = new TestDocument(), piece = new TestElement(document), capture = separateCapture ? new TestElement(document) : piece;
+    const active: DragHandle = { pointer: 1, element: piece.element, capture: capture.element };
+    let drag: DragHandle | undefined = active;
+    piece.classList.add('dragging'); piece.style.transform = 'translate(30px, 40px)'; capture.setPointerCapture(1);
+    const ending = bindDragEnd(document as unknown as Document, () => drag, () => { drag = undefined; });
+    ending.watch();
+    const clean = (): void => {
+        expect(drag).toBeUndefined(); expect(piece.classList.has('dragging')).toBe(false);
+        expect(piece.style.transform).toBe(''); expect(capture.hasPointerCapture(1)).toBe(false); expect(document.frames.size).toBe(0);
+    };
+    return { document, piece, capture, ending, clean, current: () => drag };
+}
+afterEach(() => vi.unstubAllGlobals());
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture', 'visibilitychange']) {
+    it(`clears ownership, visuals and capture on ${type}, including a separate capture target`, () => {
+        for (const separate of [false, true]) {
+            const f = fixture(separate);
+            if (type === 'visibilitychange') f.document.hidden = true;
+            send(f.document, type); f.clean();
+            send(f.document, type); f.ending.finish(); f.clean(); f.ending.dispose();
+        }
+    });
+}
+it('cleans a stationary gesture when capture is released without lostpointercapture delivery', () => {
+    const f = fixture(); f.capture.releasePointerCapture(1);
+    f.document.frame(); f.clean(); f.ending.dispose();
+});
+it('cleans the original detached node when a render replaces it', () => {
+    const f = fixture(); f.piece.isConnected = false;
+    f.document.frame(); f.clean(); f.ending.dispose();
+});
+it('ignores endings from a second finger and visible visibility changes', () => {
+    const f = fixture();
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) send(f.document, type, { pointerId: 2 });
+    send(f.document, 'visibilitychange'); f.document.frame();
+    expect(f.current()).toBeDefined(); expect(f.piece.classList.has('dragging')).toBe(true);
+    f.ending.dispose(); f.clean();
+});
+it('forgets ownership before capture release can dispatch a reentrant lostpointercapture', () => {
+    const f = fixture();
+    f.capture.releasePointerCapture = pointer => {
+        expect(f.current()).toBeUndefined(); f.capture.captures.delete(pointer); send(f.document, 'lostpointercapture');
+    };
+    f.ending.finish(); f.clean(); f.ending.dispose();
+});
+it('does not cancel a successful release twice when its drop handler already finished', () => {
+    const document = new TestDocument(), piece = new TestElement(document), cancelled = vi.fn();
+    let drag: DragHandle | undefined = { pointer: 1, element: piece.element };
+    piece.setPointerCapture(1);
+    const ending = bindDragEnd(document as unknown as Document, () => drag, () => { drag = undefined; }, cancelled);
+    ending.watch(); ending.finish(); send(document, 'pointerup');
+    expect(cancelled).not.toHaveBeenCalled(); expect(document.frames.size).toBe(0); ending.dispose();
+});
+for (const missingOwner of [false, true]) it(`uses the global scheduler when the document has no view, missing owner ${missingOwner}`, () => {
+    const document = Object.assign(new EventTarget(), { hidden: false, defaultView: null });
+    const scheduler = new TestDocument();
+    vi.stubGlobal('document', document);
+    vi.stubGlobal('requestAnimationFrame', scheduler.defaultView.requestAnimationFrame);
+    vi.stubGlobal('cancelAnimationFrame', scheduler.defaultView.cancelAnimationFrame);
+    const piece = new TestElement(document as unknown as TestDocument);
+    let drag: DragHandle | undefined = { pointer: 1, element: piece.element };
+    piece.setPointerCapture(1); piece.style.transform = 'translate(10px, 20px)'; piece.classList.add('dragging');
+    const ending = bindDragEnd(missingOwner ? undefined : document as unknown as Document, () => drag, () => { drag = undefined; });
+    ending.watch(); expect(scheduler.frames.size).toBe(1);
+    send(document, 'pointercancel');
+    expect(drag).toBeUndefined(); expect(piece.style.transform).toBe('');
+    expect(piece.classList.has('dragging')).toBe(false); expect(piece.hasPointerCapture(1)).toBe(false);
+    expect(scheduler.frames.size).toBe(0); ending.dispose();
+});
+it('keeps event cleanup available when neither document nor globals provide animation frames', () => {
+    const document = Object.assign(new EventTarget(), { hidden: false, defaultView: null });
+    vi.stubGlobal('requestAnimationFrame', undefined); vi.stubGlobal('cancelAnimationFrame', undefined);
+    const piece = new TestElement(document as unknown as TestDocument);
+    let drag: DragHandle | undefined = { pointer: 1, element: piece.element };
+    piece.setPointerCapture(1);
+    const ending = bindDragEnd(document as unknown as Document, () => drag, () => { drag = undefined; });
+    ending.watch(); send(document, 'lostpointercapture');
+    expect(drag).toBeUndefined(); expect(piece.hasPointerCapture(1)).toBe(false); ending.dispose();
+});

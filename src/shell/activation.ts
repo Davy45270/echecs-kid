@@ -1,0 +1,82 @@
+// Repris d'Opencadkid (src/shell/activation.ts)
+import { distanceToZone, type Rect } from './coordinates';
+export interface ActivationEvent { target: string; type: string; time: number; accepted: boolean; reason: string }
+const origin = performance.now();
+const history: ActivationEvent[] = [];
+export function activationEvents(): ActivationEvent[] { return history.map(event => ({ ...event })); }
+export function recordActivation(target: string, type: string, accepted: boolean, reason: string): void {
+    history.push({ target, type, time: performance.now() - origin, accepted, reason });
+    if (history.length > 200) history.shift();
+}
+type ActivationKey = string | (() => string);
+interface TargetState { last: number; compatibilityUntil: number }
+const targets = new Map<string, TargetState>();
+const bindings = new WeakMap<HTMLElement, { action: () => void; key: ActivationKey }>();
+function compatibilityClick(key: string): void {
+    const state = targets.get(key) ?? { last: -Infinity, compatibilityUntil: -Infinity };
+    state.compatibilityUntil = performance.now() + 350; targets.set(key, state);
+}
+export function resetActivations(): void { targets.clear(); }
+/** Debounce only the same logical target, including the state that gives the gesture its meaning. */
+export function acceptActivation(key: string, type: string, tap = true): boolean {
+    const now = performance.now(), state = targets.get(key) ?? { last: -Infinity, compatibilityUntil: -Infinity };
+    targets.set(key, state);
+    if (tap && now - state.last < 350) { recordActivation(key, type, false, 'same-target-double-tap'); return false; }
+    state.last = tap ? now : -Infinity;
+    recordActivation(key, type, true, tap ? 'distinct-gesture' : 'primary-drag'); return true;
+}
+/** Release commits once; browser compatibility clicks never commit a touch again. */
+let anonymousTarget = 0;
+export function bindAction(element: HTMLElement, action: () => void, key: ActivationKey = element.id || `action-${++anonymousTarget}`): void {
+    const existing = bindings.get(element);
+    if (existing) { existing.action = action; existing.key = key; return; }
+    const binding = { action, key }; bindings.set(element, binding);
+    let touch: { id: number; x: number; y: number; moved: boolean; rect: Rect; key: string } | undefined;
+    const currentKey = (): string => typeof binding.key === 'function' ? binding.key() : binding.key;
+    let touchClickUntil = -Infinity;
+    element.addEventListener('pointerdown', event => {
+        if (event.pointerType !== 'touch') {
+            touchClickUntil = -Infinity;
+            const state = targets.get(currentKey()); if (state) state.compatibilityUntil = -Infinity;
+            return;
+        }
+        if (!event.isPrimary || touch) { touchClickUntil = performance.now() + 350; compatibilityClick(currentKey()); recordActivation(currentKey(), event.type, false, 'secondary-pointer'); return; }
+        touch = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false, rect: element.getBoundingClientRect(), key: currentKey() };
+    });
+    element.addEventListener('pointermove', event => {
+        if (touch?.id === event.pointerId && Math.hypot(event.clientX - touch.x, event.clientY - touch.y) >= 12) touch.moved = true;
+    });
+    element.addEventListener('pointerup', event => {
+        if (!touch || touch.id !== event.pointerId) return;
+        const start = touch; touch = undefined; touchClickUntil = performance.now() + 350; compatibilityClick(start.key);
+        if (start.moved || Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 12 || distanceToZone({ x: event.clientX, y: event.clientY }, start.rect) !== 0) {
+            recordActivation(start.key, event.type, false, 'drag-or-outside'); return;
+        }
+        if (acceptActivation(start.key, event.type)) binding.action();
+    });
+    for (const name of ['pointercancel', 'lostpointercapture'] as const) element.addEventListener(name, event => {
+        if (touch?.id !== event.pointerId) return;
+        touch = undefined; touchClickUntil = performance.now() + 350; compatibilityClick(currentKey()); recordActivation(currentKey(), name, false, 'cancelled');
+    });
+    element.onclick = event => {
+        if (event.detail !== 0 && (event.pointerType === 'touch' || performance.now() <= touchClickUntil || performance.now() <= (targets.get(currentKey())?.compatibilityUntil ?? -Infinity))) {
+            recordActivation(currentKey(), event.type, false, 'compatibility-click'); return;
+        }
+        recordActivation(currentKey(), event.type, true, event.detail === 0 ? 'keyboard' : 'mouse'); binding.action();
+    };
+}
+
+/** Musical exception: every pointerdown (including secondary fingers) is a beat.
+ * Keep the connected node between beats; suppress only generated clicks. */
+export function bindBeat(element: HTMLElement, action: () => void, key: string): void {
+    element.addEventListener('pointerdown', event => {
+        if (event.button !== 0 || distanceToZone({ x: event.clientX, y: event.clientY }, element.getBoundingClientRect()) !== 0) return;
+        event.preventDefault();
+        recordActivation(key, event.type, true, 'musical-beat'); action();
+    });
+    element.onclick = event => {
+        const keyboard = event.detail === 0;
+        recordActivation(key, event.type, keyboard, keyboard ? 'keyboard' : 'compatibility-click');
+        if (keyboard) action();
+    };
+}
