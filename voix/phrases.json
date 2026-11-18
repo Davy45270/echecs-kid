@@ -1,0 +1,14 @@
+{
+  "tour.regle": "La tour va tout droit : devant, derrière, sur les côtés.",
+  "prise.regle": "On prend la pièce : on se met à sa place.",
+  "tour.passe-pas": "La tour ne passe pas par-dessus.",
+  "train.consigne": "Avec la tour, va attraper l'étoile.",
+  "prise.consigne": "Avec la tour, prends le pion noir !",
+  "rochers.consigne": "Un rocher bloque le chemin : fais le tour !",
+  "bravo.1": "Bravo !",
+  "bravo.2": "Super !",
+  "bravo.3": "Bien joué !",
+  "regarde": "Regarde bien.",
+  "accueil": "Bonjour ! On apprend les échecs ?",
+  "pause": "On a bien joué. Va montrer la tour à papa !"
+}
