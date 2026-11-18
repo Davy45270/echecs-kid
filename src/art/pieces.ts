@@ -24,23 +24,26 @@ const DESSINS: Record<Kind, Dessin> = {
         corps: 'M29 80 L33 46 L27 41 L27 30 L73 30 L73 41 L67 46 L71 80 Z',
         signe: () => signe('creneaux', '<path class="piece" d="M25 12 H38 V23 H44 V12 H56 V23 H62 V12 H75 V33 H25 Z"/>')
     },
-    // Fou : mitre arrondie, boule au sommet, fente en biais.
+    // Fou : mitre en amande, nettement pointue, posée sur un col ; large entaille en biais.
     B: {
-        corps: 'M31 80 Q40 63 42 52 Q29 46 29 33 Q29 17 50 11 Q71 17 71 33 Q71 46 58 52 Q60 63 69 80 Z',
-        signe: creux => signe('fente', `<path d="M45 24 L58 38" fill="none" stroke="${creux}" stroke-width="5.5" stroke-linecap="round"/>`)
-            + '<circle class="piece" cx="50" cy="9" r="6"/>'
+        corps: 'M31 80 Q40 67 43 56 H57 Q60 67 69 80 Z'
+            + ' M35 50 Q35 48 37 48 H63 Q65 48 65 50 V56 Q65 58 63 58 H37 Q35 58 35 56 Z'
+            + ' M50 3 Q71 19 70 33 Q69 48 50 50 Q31 48 30 33 Q29 19 50 3 Z',
+        signe: creux => signe('fente', `<path d="M44 33 L64 15" fill="none" stroke="${creux}" stroke-width="8" stroke-linecap="round"/>`)
     },
-    // Dame : couronne à trois billes.
+    // Dame : taille fine, couronne évasée à pointes profondes et trois billes.
     Q: {
         corps: 'M31 80 Q39 63 41 50 Q29 46 28 36 L28 32 H72 V36 Q71 46 59 50 Q61 63 69 80 Z',
         signe: () => signe('couronne',
-            '<path class="piece" d="M24 34 L22 19 L38 28 L50 11 L62 28 L78 19 L76 34 Z"/>'
-            + ['22,16', '50,9', '78,16'].map(p => `<circle class="piece" cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="6.5"/>`).join(''))
+            '<path class="piece" d="M25 36 L17 15 L36 27 L50 7 L64 27 L83 15 L75 36 Z"/>'
+            + ['17,13', '50,6', '83,13'].map(p => `<circle class="piece" cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="6.5"/>`).join(''))
     },
-    // Roi : sommet arrondi, grande croix pleine.
+    // Roi : corps droit, large bandeau, dôme lisse ; haute croix épaisse, dressée au-dessus du dôme.
     K: {
-        corps: 'M31 80 Q39 63 41 50 Q29 46 28 38 Q28 26 50 26 Q72 26 72 38 Q71 46 59 50 Q61 63 69 80 Z',
-        signe: () => signe('croix', '<path class="piece" d="M45 2 H55 V9 H62 V18 H55 V27 H45 V18 H38 V9 H45 Z"/>')
+        corps: 'M29 80 Q37 66 40 53 H60 Q63 66 71 80 Z'
+            + ' M30 46 Q30 30 50 30 Q70 30 70 46 Z'
+            + ' M25 46 Q25 44 27 44 H73 Q75 44 75 46 V53 Q75 55 73 55 H27 Q25 55 25 53 Z',
+        signe: () => signe('croix', '<path class="piece" d="M43.5 2 H56.5 V8 H67 V19 H56.5 V31 H43.5 V19 H33 V8 H43.5 Z"/>')
     },
     // Cavalier : tête de cheval de profil, museau à gauche.
     N: {
@@ -55,6 +58,14 @@ const DESSINS: Record<Kind, Dessin> = {
     }
 };
 
+/** Liseré clair des pièces foncées : la silhouette, tracée d'un trait clair épais sous la pièce (sans ses signes). */
+const LISERE = '#e9d2a8';
+function lisere(dessin: Dessin): string {
+    const formes = [dessin.corps, PIED].map(d => `<path d="${d}"/>`).join('')
+        + [...dessin.signe('none').matchAll(/<(path|circle) class="piece"[^>]*\/>/g)].map(m => m[0].replace(' class="piece"', '')).join('');
+    return `<g fill="${LISERE}" stroke="${LISERE}" stroke-width="7" stroke-linejoin="round">${formes}</g>`;
+}
+
 let compteur = 0;
 
 export function pieceSvg(piece: Piece, size: number): string {
@@ -67,6 +78,7 @@ export function pieceSvg(piece: Piece, size: number): string {
         + '</linearGradient>'
         + `<style>#${id}-g .piece{fill:url(#${id});stroke:${bois.trait};stroke-width:2.5;stroke-linejoin:round}</style></defs>`
         + '<ellipse cx="50" cy="91" rx="36" ry="5" fill="#000" fill-opacity="0.22"/>'
+        + (piece.color === 'b' ? lisere(dessin) : '')
         + `<g id="${id}-g">`
         + `<path class="piece" d="${dessin.corps}"/>`
         + dessin.signe(bois.creux)
