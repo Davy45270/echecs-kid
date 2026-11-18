@@ -30,7 +30,7 @@ Les constats sont recopiés tels quels ; seuls les chemins ont été ramenés à
 
 - **BLOQUANT, détours refusés (`tour.rochers.1` à `4`)** : corrigé. Un coup légal n'est plus jamais une erreur dans le
   gabarit Deplacer (`src/jeu/deplacer.ts`) : il est joué, et la situation se termine quand toutes les cibles sont
-  attrapées. `acceptes` devient la solution de référence écrite à la main (tracé de l'aide 2, démonstration), vérifiée
+  attrapées. `acceptes` devient la solution de référence écrite à la main (l'aide et la démonstration se calculent depuis la tour), vérifiée
   par `tests/situations.test.ts` : légale, complète, et de longueur minimale sur tous les ordres de cibles. Si l'enfant
   erre (3 coups légaux de suite sans rien attraper), le chemin vers la cible la plus proche s'éclaire, calculé depuis la
   tour ; après 6, la démonstration se joue depuis la position courante. Ce n'est pas compté comme une erreur, mais la

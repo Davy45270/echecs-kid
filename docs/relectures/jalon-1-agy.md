@@ -51,7 +51,7 @@ racine du dépôt. Les numéros de ligne renvoient au code relu, avant correctio
 
 1. **BLOQUANT, contournements légaux punis** : corrigé, par la seconde voie proposée. Tout coup légal de la tour est
    joué (`src/jeu/deplacer.ts`) ; seule l'atteinte de toutes les cibles termine la situation. `acceptes` n'est plus que
-   la solution de référence (aide 2, démonstration), vérifiée légale, complète et minimale par
+   la solution de référence écrite à la main (l'aide et la démonstration se calculent depuis la tour), vérifiée légale, complète et minimale par
    `tests/situations.test.ts`. Après 3 coups légaux sans rien attraper, le chemin vers la cible la plus proche
    s'éclaire depuis la tour, sans compter d'erreur ; après 6, la démonstration se joue ; la situation finit alors
    « avec aide ».
