@@ -19,3 +19,14 @@ test('captures des pièces et de la mascotte', async ({ page }) => {
     await page.setContent(`${css}<div id="c"><div class="rang">${(['accueil', 'bravo', 'reflechit', 'baille'] as const).map(p => mascotteSvg(p, 120)).join('')}</div></div>`);
     await page.locator('#c').screenshot({ path: 'docs/captures/mascotte.png' });
 });
+
+test('captures de la première situation, téléphone étroit et grand écran', async ({ page }) => {
+    for (const [nom, width, height] of [['jeu-360x740', 360, 740], ['jeu-1280x800', 1280, 800]] as const) {
+        await page.setViewportSize({ width, height });
+        await page.goto('/');
+        await page.locator('#tour').click();
+        await page.locator('.plateau').waitFor();
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: `docs/captures/${nom}.png` });
+    }
+});

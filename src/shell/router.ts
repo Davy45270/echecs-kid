@@ -1,15 +1,14 @@
 // Routeur minimal : un écran à la fois dans #app. Les écrans se branchent dans `screens`.
 import { renderAccueil } from '../ui/accueil';
 import { renderParent } from '../ui/parent';
-import { renderJeuProvisoire } from '../ui/jeu-provisoire';
+import { renderJeu } from '../ui/jeu';
 
 export type Screen = 'accueil' | 'jeu' | 'parent';
 export type Renderer = (root: HTMLElement, arg?: string) => void;
 
-/** La tâche 6 remplace l'entrée `jeu` par le vrai écran de jeu. */
 export const screens: Record<Screen, Renderer> = {
     accueil: renderAccueil,
-    jeu: renderJeuProvisoire,
+    jeu: renderJeu,
     parent: renderParent
 };
 

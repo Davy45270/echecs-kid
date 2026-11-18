@@ -11,3 +11,56 @@ button { min-width: 48px; min-height: 48px; font: inherit; cursor: pointer; }
 .parent .reponses { display: flex; gap: 12px; }
 .parent .reponses button { flex: 1; }
 .parent input[type=range] { width: 100%; min-height: 48px; }
+
+/* Écran de jeu : barre d'icônes, plateau en bois, mascotte. */
+.jeu { justify-content: flex-start; gap: 12px; padding: 8px 12px 16px; overflow-x: clip; }
+.jeu .barre { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 720px; gap: 8px; }
+.jeu .barre .bouton-icone { width: 56px; height: 56px; background: #fffaf0; box-shadow: 0 2px 0 #d9c9a3; }
+.jeu .barre .bouton-icone svg { width: 32px; height: 32px; }
+.avancee { display: flex; gap: 2px; align-items: center; }
+.avancee span { display: block; line-height: 0; opacity: .3; filter: grayscale(1); transition: transform .3s, opacity .3s; }
+.avancee span.faite { opacity: 1; filter: none; }
+.avancee span.en-cours { opacity: 1; filter: none; transform: scale(1.25); }
+.avancee span.en-cours:not(.faite) svg path:first-child { fill: #fff6d6; }
+.scene { flex: 1 0 auto; display: flex; align-items: center; justify-content: center; width: 100%; }
+.mascotte-jeu { line-height: 0; min-height: 112px; }
+
+.plateau { --c: 56px; position: relative; width: calc(var(--c) * var(--cols)); height: calc(var(--c) * var(--rangs));
+    border-radius: 6px; box-shadow: 0 0 0 6px #6b4423, 0 10px 24px rgb(60 35 10 / .35); touch-action: none; user-select: none; -webkit-user-select: none; }
+.plateau > * { position: absolute; left: calc(var(--c) * var(--f)); top: calc(var(--c) * var(--r)); width: var(--c); height: var(--c); }
+.plateau svg { width: 100%; height: 100%; display: block; }
+.case { transition: background-color .3s, box-shadow .3s; }
+.case.clair { background: #f0d9b5; }
+.case.fonce { background: #b58863; }
+.case.legale::after { content: ''; position: absolute; inset: calc(var(--c) * .36); border-radius: 50%; background: rgb(66 108 80 / .55); }
+.case.trajet { box-shadow: inset 0 0 0 calc(var(--c) * .5) rgb(255 220 90 / .55); }
+.etoile, .rocher, .anneau, .piece, .contour { pointer-events: none; }
+.etoile { padding: calc(var(--c) * .1); transition: transform .3s, opacity .3s; }
+.etoile { opacity: .5; transform: scale(.7); }
+.etoile.visee { opacity: 1; transform: none; animation: brille 1.8s ease-in-out infinite; }
+.anneau[hidden] { display: none; }
+.rocher { padding: calc(var(--c) * .04); }
+.anneau { border-radius: 50%; box-shadow: inset 0 0 0 5px #ffd54a, 0 0 14px 4px rgb(255 213 74 / .8); animation: pulse 1.6s ease-in-out infinite; }
+.piece { padding: calc(var(--c) * .02); transition: left .28s ease-out, top .28s ease-out, transform .28s ease-out, opacity .28s; z-index: 2; }
+.piece.choisie { transform: translateY(-6%) scale(1.08); filter: drop-shadow(0 0 6px #ffd54a) drop-shadow(0 0 2px #ffd54a); }
+.piece.dragging { transition: none; z-index: 3; }
+.piece.prise { opacity: 0; transform: scale(.4); }
+.etoile.cueillie { opacity: 0 !important; transform: scale(1.6) !important; }
+.piece.secoue { animation: secoue .3s ease-in-out; }
+.piece.invite { animation: invite .3s ease-in-out 2; }
+.contour { z-index: 1; top: calc(var(--c) * var(--r) - 24px); height: calc(var(--c) + 24px); border: 4px solid #2f6fd6; border-radius: 10px; }
+.plateau.fete { animation: fete .3s ease-out; }
+@keyframes secoue { 0%, 100% { translate: 0; } 25% { translate: -8px 0; } 75% { translate: 8px 0; } }
+@keyframes invite { 0%, 100% { translate: 0; } 50% { translate: 0 -10px; } }
+@keyframes brille { 0%, 100% { scale: 1; } 50% { scale: 1.08; } }
+@keyframes pulse { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
+@keyframes fete { 0% { scale: 1; } 50% { scale: 1.03; } 100% { scale: 1; } }
+.mascotte-jeu.saute { animation: invite .3s ease-out; }
+
+.pause { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.mascotte-pause { line-height: 0; }
+.bouton-continuer { width: 112px; height: 112px; border-radius: 50%; border: 0; background: #426c50; color: #fff; box-shadow: 0 6px 0 #2c4a36; display: inline-flex; align-items: center; justify-content: center; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+}
