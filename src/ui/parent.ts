@@ -31,7 +31,7 @@ function reglages(root: HTMLElement): void {
     root.innerHTML = `<section class="ecran parent"><h1>Espace parent</h1>`
         + `<label>Volume : <output id="volume-val">${Math.round(save.volume * 100)}</output> %<input id="volume" type="range" min="30" max="100" step="5" value="${Math.round(save.volume * 100)}"></label>`
         + `<h2>Palier Tour</h2><p id="statut-tour">${seules} situation(s) réussie(s) seule, ${aidees} terminée(s) avec aide.</p>`
-        + `<h2>Crédits</h2><p>Voix : Piper, voix siwis (CC BY 4.0). Application sous licence MIT.</p>`
+        + `<h2>Crédits</h2><p>Voix : Piper, voix siwis (base SIWIS), licence <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.</p><p>Code : licence MIT.</p>`
         + `<button id="effacer">Effacer la progression</button><div id="confirmation"></div>`
         + `<button id="fermer">Fermer</button></section>`;
     const volume = root.querySelector<HTMLInputElement>('#volume')!;

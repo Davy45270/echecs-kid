@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { situationsTour, type Situation } from '../src/content/situations';
-import { etatInitial, jouer, solution } from '../src/jeu/deplacer';
+import { coupsLegaux, demoDue, depart, etatInitial, jouer, restantes, solution, trajet, trajetProche } from '../src/jeu/deplacer';
 import { taillesCase } from '../src/ui/plateau';
 import { fromLayout } from '../src/engine/board';
 import { slidingMoves } from '../src/engine/sliding';
@@ -77,6 +77,52 @@ describe('catalogue du palier Tour', () => {
             expect([...r.prises].sort(), s.id).toEqual([...s.cibles].sort());
             expect(s.acceptes.length, s.id).toBe(minimum(s));
         }
+    });
+
+    it('every enemy piece is a target (a captured piece never has to come back)', () => {
+        for (const s of situationsTour)
+            for (const [k, p] of Object.entries(s.pieces)) if (p.startsWith('b')) expect(s.cibles, `${s.id} ${k}`).toContain(k);
+    });
+
+    it('every reachable state is solvable, and finishing means every target was caught', () => {
+        for (const s of situationsTour) {
+            // Parcours de tous les états (case, cibles attrapées) atteignables par des coups légaux.
+            const vus = new Set<string>();
+            const pile = [{ pos: depart(s), at: [] as string[] }];
+            while (pile.length) {
+                const { pos, at } = pile.pop()!;
+                const k = `${pos}|${[...at].sort().join(' ')}`;
+                if (vus.has(k)) continue;
+                vus.add(k);
+                if (at.length === s.cibles.length) continue;
+                let e = { ...etatInitial(), atteintes: at, prises: at.filter(c => s.pieces[c]?.startsWith('b')) };
+                let p = pos;
+                for (const q of solution(s, at, pos)) {
+                    const r = jouer(s, e, p, q, 0);
+                    expect(['avance', 'prise', 'finie'], `${s.id} ${k}`).toContain(r.effet);
+                    e = r.etat; p = q;
+                }
+                expect(e.finie, `${s.id} ${k}`).not.toBeNull();
+                expect(trajetProche(s, at, pos).length, `${s.id} ${k}`).toBeGreaterThan(0);
+                expect(trajet(s, at, pos).length, `${s.id} ${k}`).toBeGreaterThan(0);
+                const depuis = { ...etatInitial(), atteintes: at, prises: at.filter(c => s.pieces[c]?.startsWith('b')) };
+                for (const q of coupsLegaux(s, depuis.prises, pos)) {
+                    const r = jouer(s, depuis, pos, q, 0);
+                    if (r.effet === 'finie') expect(restantes(s, r.etat), `${s.id} ${k}`).toEqual([]);
+                    pile.push({ pos: q, at: r.etat.atteintes });
+                }
+            }
+        }
+    });
+
+    it('long wandering ends in the demo', () => {
+        const s = situationsTour[3]!;
+        let e = etatInitial(); let p = depart(s); let pas = 0;
+        while (!demoDue(e) && e.finie === null && pas < 100) {
+            const q = coupsLegaux(s, e.prises, p).find(x => !restantes(s, e).includes(x))!;
+            e = jouer(s, e, p, q, 0).etat; p = q; pas++;
+        }
+        expect(demoDue(e)).toBe(true);
     });
 
     it('every situation is solvable', () => {

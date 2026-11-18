@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { situationsTour, type Situation } from '../src/content/situations';
 import {
-    demoDue, demontrer, depart, ERRANCE_DEMO, ERRANCE_TRAJET, etatInitial, jouer, pauseDue, raisonRegle, restantes, solution, trajet, trajetProche,
-    VERROU_MS, type Etat
+    coupsLegaux, demoDue, demontrer, depart, ERRANCE_DEMO, ERRANCE_TRAJET, etatInitial, jouer, pauseDue, plateauCourant, raisonRegle, restantes, solution,
+    trajet, trajetProche, VERROU_MS, type Etat
 } from '../src/jeu/deplacer';
 
 const parId = (id: string): Situation => situationsTour.find(s => s.id === id)!;
@@ -154,6 +154,31 @@ describe('jouer', () => {
         const d = demontrer(rochers1, { ...etatInitial(), erreurs: 3, aide: 3 });
         expect(d.finie).toBe('aidee');
         expect(d.atteintes).toEqual(['5,2']);
+    });
+
+    it('the demo starts with the lit path: nearest target first', () => {
+        for (const s of situationsTour) {
+            for (const p of [depart(s), ...coupsLegaux(s, [], depart(s))]) {
+                if (s.cibles.includes(p)) continue;
+                const demo = solution(s, [], p);
+                const premiere = demo.findIndex(q => s.cibles.includes(q));
+                const eclaire = trajet(s, [], p);
+                expect(eclaire.at(-1), `${s.id} ${p}`).toBe(demo[premiere]);
+                for (const q of demo.slice(0, premiere + 1)) expect(eclaire, `${s.id} ${p}`).toContain(q);
+            }
+        }
+    });
+
+    it('a captured piece that is not a target never comes back', () => {
+        const s: Situation = { ...train2, id: 'essai', pieces: { '0,0': 'wR', '0,2': 'bP' }, cibles: ['3,3'], acceptes: ['3,0', '3,3'] };
+        const r = jouer(s, etatInitial(), '0,0', '0,2', 0);
+        expect(r.effet).toBe('avance');
+        expect(r.etat.prises).toEqual(['0,2']);
+        expect(r.etat.atteintes).toEqual([]);
+        // La tour repart : le pion pris n'est plus sur le plateau.
+        const plus = jouer(s, r.etat, '0,2', '0,0', 0);
+        expect(plateauCourant(s, plus.etat.prises, '0,0').pieces.has('0,2')).toBe(false);
+        expect(jouer(s, plus.etat, '0,0', '0,3', 0).effet).toBe('avance');
     });
 
     it('touches during the 1.5 s lock are ignored and not counted', () => {

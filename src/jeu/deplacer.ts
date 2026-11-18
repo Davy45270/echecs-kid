@@ -11,6 +11,8 @@ export type Etat = {
     coup: number;
     /** Cibles déjà attrapées (étoiles cueillies, pièces adverses prises), dans l'ordre où elles l'ont été. */
     atteintes: string[];
+    /** Toutes les pièces adverses prises, cibles ou non : elles ne reviennent jamais sur le plateau. */
+    prises: string[];
     /** Coups illégaux depuis la dernière cible attrapée. */
     erreurs: number;
     aide: 0 | 1 | 2 | 3;
@@ -33,7 +35,7 @@ export const ERRANCE_DEMO = 6;
 export const PAUSE_SITUATIONS = 10;
 export const PAUSE_MS = 10 * 60_000;
 
-export const etatInitial = (): Etat => ({ coup: 0, atteintes: [], erreurs: 0, aide: 0, errance: 0, aideeUneFois: false, verrouJusqua: 0, finie: null });
+export const etatInitial = (): Etat => ({ coup: 0, atteintes: [], prises: [], erreurs: 0, aide: 0, errance: 0, aideeUneFois: false, verrouJusqua: 0, finie: null });
 
 export const versCase = (k: string): Square => {
     const [file = 0, rank = 0] = k.split(',').map(Number);
@@ -53,17 +55,17 @@ export const restantes = (s: Situation, e: Pick<Etat, 'atteintes'>): string[] =>
 /** La démonstration est due : 3e erreur, ou 6 coups d'errance. */
 export const demoDue = (e: Etat): boolean => e.finie === null && (e.aide === 3 || e.errance >= ERRANCE_DEMO);
 
-/** Le plateau, la tour posée sur `position` ; les pièces adverses déjà prises (`atteintes`) ont disparu. */
-export function plateauCourant(s: Situation, atteintes: string[], position: string): Board {
+/** Le plateau, la tour posée sur `position` ; toute pièce prise (`prises`, cibles atteintes comprises) a disparu. */
+export function plateauCourant(s: Situation, prises: string[], position: string): Board {
     const tour = depart(s);
     const layout: Record<string, string> = {};
-    for (const [k, p] of Object.entries(s.pieces)) if (k !== tour && !atteintes.includes(k)) layout[k] = p;
+    for (const [k, p] of Object.entries(s.pieces)) if (k !== tour && !prises.includes(k)) layout[k] = p;
     layout[position] = 'wR';
     return fromLayout(s.taille[0], s.taille[1], layout, s.rochers);
 }
 
-export const coupsLegaux = (s: Situation, atteintes: string[], position: string): string[] =>
-    slidingMoves(plateauCourant(s, atteintes, position), versCase(position)).map(key);
+export const coupsLegaux = (s: Situation, prises: string[], position: string): string[] =>
+    slidingMoves(plateauCourant(s, prises, position), versCase(position)).map(key);
 
 /** Cases strictement entre deux cases d'une même ligne ou colonne (vide sinon). */
 function entre(de: string, vers: string): string[] {
@@ -84,10 +86,10 @@ function parcourues(depuis: string, coups: string[]): string[] {
 }
 
 /** Phrase de rappel pour un coup illégal : sur la ligne mais bloqué → « ne passe pas », sinon la règle de la tour. */
-export function raisonRegle(s: Situation, atteintes: string[], de: string, vers: string): 'tour.regle' | 'tour.passe-pas' {
+export function raisonRegle(s: Situation, prises: string[], de: string, vers: string): 'tour.regle' | 'tour.passe-pas' {
     const a = versCase(de), b = versCase(vers);
     if (de === vers || (a.file !== b.file && a.rank !== b.rank)) return 'tour.regle';
-    const board = plateauCourant(s, atteintes, de);
+    const board = plateauCourant(s, prises, de);
     const bloque = (k: string): boolean => board.blocked.has(k) || board.pieces.has(k);
     return entre(de, vers).some(bloque) || board.blocked.has(vers) || board.pieces.get(vers)?.color === 'w' ? 'tour.passe-pas' : 'tour.regle';
 }
@@ -97,7 +99,7 @@ export function jouer(s: Situation, e: Etat, de: string, vers: string, maintenan
     if (e.finie !== null || maintenant < e.verrouJusqua || de === vers) return ignore;
     // Toucher une autre pièce à soi, c'est changer de sélection, jamais une erreur.
     if (de !== depart(s) && s.pieces[de]?.startsWith('w')) return ignore;
-    const board = plateauCourant(s, e.atteintes, de);
+    const board = plateauCourant(s, [...e.atteintes, ...e.prises], de);
     // Poser la tour sur sa propre pièce : « la tour ne passe pas par-dessus », la tour revient, sans erreur ni verrou.
     if (board.pieces.get(vers)?.color === 'w') return { etat: e, effet: 'passe-pas' };
 
@@ -110,42 +112,29 @@ export function jouer(s: Situation, e: Etat, de: string, vers: string, maintenan
         };
     }
     const coup = e.coup + 1;
+    const prises = board.pieces.get(vers)?.color === 'b' ? [...e.prises, vers] : e.prises;
     if (!restantes(s, e).includes(vers)) {
         // Coup légal qui n'attrape rien : joué. Au 3e de suite, le chemin s'éclaire et la situation comptera « avec aide ».
         const errance = e.errance + 1;
-        return { etat: { ...e, coup, errance, aideeUneFois: e.aideeUneFois || errance >= ERRANCE_TRAJET }, effet: 'avance' };
+        return { etat: { ...e, coup, prises, errance, aideeUneFois: e.aideeUneFois || errance >= ERRANCE_TRAJET }, effet: 'avance' };
     }
     // Une cible attrapée : les compteurs d'aide repartent de zéro.
     const atteintes = [...e.atteintes, vers];
-    const suite: Etat = { ...e, coup, atteintes, erreurs: 0, aide: 0, errance: 0 };
+    const suite: Etat = { ...e, coup, atteintes, prises, erreurs: 0, aide: 0, errance: 0 };
     if (atteintes.length === s.cibles.length) return { etat: { ...suite, finie: e.aideeUneFois ? 'aidee' : 'seule' }, effet: 'finie' };
     return { etat: suite, effet: board.pieces.get(vers)?.color === 'b' ? 'prise' : 'avance' };
 }
 
-/** Si l'enfant suit la solution de référence (même case, mêmes cibles attrapées), ce qu'il en reste ; sinon undefined. */
-function resteReference(s: Situation, atteintes: string[], depuis: string): string[] | undefined {
-    const voulu = [...atteintes].sort().join(' ');
-    let pos = depart(s);
-    const prises: string[] = [];
-    for (let k = 0; k <= s.acceptes.length; k++) {
-        if (pos === depuis && [...prises].sort().join(' ') === voulu) return s.acceptes.slice(k);
-        const q = s.acceptes[k];
-        if (q === undefined) break;
-        if (s.cibles.includes(q) && !prises.includes(q)) prises.push(q);
-        pos = q;
-    }
-    return undefined;
-}
-
 /** Plus court chemin (cases d'arrivée) vers la cible restante la plus proche : BFS sur le moteur depuis `depuis`. */
-function cheminProche(s: Situation, atteintes: string[], depuis: string): string[] {
+function cheminProche(s: Situation, atteintes: string[], depuis: string, prises: string[] = []): string[] {
     const reste = s.cibles.filter(c => !atteintes.includes(c));
+    const otees = [...atteintes, ...prises];
     const parent = new Map<string, string>([[depuis, '']]);
     let front = [depuis];
     while (front.length > 0) {
         const suivant: string[] = [];
         for (const p of front) {
-            for (const q of coupsLegaux(s, atteintes, p)) {
+            for (const q of coupsLegaux(s, otees, p)) {
                 if (parent.has(q)) continue;
                 parent.set(q, p);
                 if (reste.includes(q)) {
@@ -161,47 +150,38 @@ function cheminProche(s: Situation, atteintes: string[], depuis: string): string
     return [];
 }
 
-/** Plus courte partie (cases d'arrivée) qui attrape toutes les cibles restantes, dans le meilleur ordre (BFS). */
-function cheminComplet(s: Situation, atteintes: string[], depuis: string): string[] {
-    type Noeud = { pos: string; prises: string[]; chemin: string[] };
-    const cle = (n: Noeud): string => `${n.pos}|${[...n.prises].sort().join(' ')}`;
-    let front: Noeud[] = [{ pos: depuis, prises: atteintes, chemin: [] }];
-    const vus = new Set(front.map(cle));
-    while (front.length > 0) {
-        const suivant: Noeud[] = [];
-        for (const n of front) {
-            if (n.prises.length === s.cibles.length) return n.chemin;
-            for (const q of coupsLegaux(s, n.prises, n.pos)) {
-                const prises = s.cibles.includes(q) && !n.prises.includes(q) ? [...n.prises, q] : n.prises;
-                const m = { pos: q, prises, chemin: [...n.chemin, q] };
-                if (vus.has(cle(m))) continue;
-                vus.add(cle(m));
-                suivant.push(m);
-            }
-        }
-        front = suivant;
+/**
+ * Démonstration : depuis `depuis`, la cible restante la plus proche, puis la suivante la plus proche, etc.
+ * Son premier tronçon est exactement le chemin éclairé (`trajet`).
+ */
+export function solution(s: Situation, atteintes: string[], depuis: string, prises: string[] = []): string[] {
+    const out: string[] = [];
+    let pos = depuis;
+    const faites = [...atteintes];
+    while (faites.length < s.cibles.length) {
+        const troncon = cheminProche(s, faites, pos, prises);
+        const fin = troncon.at(-1);
+        if (fin === undefined) break;
+        out.push(...troncon);
+        faites.push(fin);
+        pos = fin;
     }
-    return [];
+    return out;
 }
-
-/** Cases d'arrivée qui terminent la situation depuis `depuis` : la référence si l'enfant la suit, sinon un BFS. */
-export const solution = (s: Situation, atteintes: string[], depuis: string): string[] =>
-    resteReference(s, atteintes, depuis) ?? cheminComplet(s, atteintes, depuis);
 
 /** Cases parcourues jusqu'à la cible restante la plus proche, depuis la position courante (errance). */
-export const trajetProche = (s: Situation, atteintes: string[], depuis: string): string[] =>
-    parcourues(depuis, cheminProche(s, atteintes, depuis));
+export const trajetProche = (s: Situation, atteintes: string[], depuis: string, prises: string[] = []): string[] =>
+    parcourues(depuis, cheminProche(s, atteintes, depuis, prises));
 
-/** Aide 2 : les cases parcourues jusqu'à la prochaine cible (la référence si l'enfant la suit, sinon la plus proche). */
-export function trajet(s: Situation, atteintes: string[], depuis: string): string[] {
-    const ref = resteReference(s, atteintes, depuis);
-    if (ref === undefined) return trajetProche(s, atteintes, depuis);
-    const i = ref.findIndex(q => s.cibles.includes(q) && !atteintes.includes(q));
-    return parcourues(depuis, ref.slice(0, i + 1));
-}
+/** Aide 2 : le même chemin, celui que la démonstration prendra en premier. */
+export const trajet = trajetProche;
 
 /** Après la démonstration (jouée depuis la position courante), la situation est terminée « avec aide ». */
-export const demontrer = (s: Situation, e: Etat): Etat => ({ ...e, atteintes: [...e.atteintes, ...restantes(s, e)], aideeUneFois: true, finie: 'aidee' });
+export function demontrer(s: Situation, e: Etat): Etat {
+    const reste = restantes(s, e);
+    const prises = [...e.prises, ...reste.filter(c => s.pieces[c]?.startsWith('b'))];
+    return { ...e, atteintes: [...e.atteintes, ...reste], prises, aideeUneFois: true, finie: 'aidee' };
+}
 
 export const pauseDue = (faites: number, debut: number, maintenant: number): boolean =>
     faites >= PAUSE_SITUATIONS || maintenant - debut >= PAUSE_MS;

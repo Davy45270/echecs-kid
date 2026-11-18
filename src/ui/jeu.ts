@@ -32,6 +32,7 @@ export function renderJeu(root: HTMLElement): void {
     const vivant = (): boolean => moi === generation && root.isConnected && root.dataset.screen === 'jeu';
     seance.debut = Date.now();
     seance.faites = 0;
+    priseExpliquee = false;
     const storage = browserStorage();
     const courante = readSave(storage).progress.courante[PALIER] ?? 0;
     let index = courante >= 0 && courante < situations.length ? courante : 0;
@@ -60,7 +61,8 @@ export function renderJeu(root: HTMLElement): void {
     let etat: Etat = etatInitial();
     let position = depart(s);
     let plateau: Plateau | undefined;
-    let occupe = false; // démonstration ou fête en cours
+    let occupe = false; // démonstration, explication de la prise ou fête en cours
+    let partie = 0; // change à chaque situation commencée
     let minuterie: ReturnType<typeof setTimeout> | undefined;
 
     const relancer = (): void => {
@@ -79,10 +81,11 @@ export function renderJeu(root: HTMLElement): void {
         }).join('');
     };
 
-    const legauxSiDecouverte = (): string[] => s.decouverte ? coupsLegaux(s, etat.atteintes, position) : [];
+    const legauxSiDecouverte = (): string[] => s.decouverte ? coupsLegaux(s, etat.prises, position) : [];
 
     const commencer = (i: number): void => {
         index = i;
+        partie++;
         s = situations[i]!;
         etat = etatInitial();
         position = depart(s);
@@ -91,6 +94,8 @@ export function renderJeu(root: HTMLElement): void {
         plateau = creerPlateau(s, taille(), {
             actif: () => vivant() && !occupe && etat.finie === null && Date.now() >= etat.verrouJusqua,
             choisie: k => { if (k === position) plateau?.selectionner(k, legauxSiDecouverte()); },
+            // Seule la tour bouge ici : toute autre pièce à soi est immobile.
+            mobile: k => k === position,
             coup: (de, vers) => { void tenter(de, vers); },
             toucher: relancer
         });
@@ -111,8 +116,8 @@ export function renderJeu(root: HTMLElement): void {
     /** Le chemin éclairé : après 3 coups d'errance, vers la cible la plus proche ; à l'aide 2, le trajet conseillé. */
     const eclairage = (): string[] => {
         if (etat.finie !== null) return [];
-        if (etat.errance >= ERRANCE_TRAJET) return trajetProche(s, etat.atteintes, position);
-        return etat.aide >= 2 ? trajet(s, etat.atteintes, position) : [];
+        if (etat.errance >= ERRANCE_TRAJET) return trajetProche(s, etat.atteintes, position, etat.prises);
+        return etat.aide >= 2 ? trajet(s, etat.atteintes, position, etat.prises) : [];
     };
 
     async function tenter(de: string, vers: string): Promise<void> {
@@ -120,6 +125,7 @@ export function renderJeu(root: HTMLElement): void {
         if (!plateau || de !== position) return;
         const avant = position;
         const avantes = etat.atteintes.length;
+        const prisesAvant = etat.prises.length;
         const r = jouer(s, etat, avant, vers, Date.now());
         if (r.effet === 'ignore') return;
         etat = r.etat;
@@ -132,17 +138,17 @@ export function renderJeu(root: HTMLElement): void {
             plateau.secouer(avant);
             poser('reflechit');
             if (demoDue(etat)) { await montrer(); return; }
-            void dire(raisonRegle(s, etat.atteintes, avant, vers));
+            void dire(raisonRegle(s, etat.prises, avant, vers));
             plateau.eclairer(eclairage());
             return;
         }
         // Coup légal : toujours joué.
         const etaitCible = etat.atteintes.length > avantes;
-        let expliquee = false;
-        if (etaitCible && s.pieces[vers]?.startsWith('b')) {
+        let explication: Promise<void> | undefined;
+        if (etat.prises.length > prisesAvant) {
             plateau.prendre(vers);
-            // R4 : la première prise de la séance s'explique.
-            if (!priseExpliquee) { priseExpliquee = true; expliquee = true; void dire('prise.regle'); }
+            // R4 : la première prise de la séance s'explique, sans être coupée : les touchers attendent la fin de la phrase.
+            if (!priseExpliquee) { priseExpliquee = true; occupe = true; explication = dire('prise.regle'); }
         }
         plateau.deplacer(avant, vers);
         position = vers;
@@ -151,8 +157,14 @@ export function renderJeu(root: HTMLElement): void {
         plateau.viser(restantes(s, etat));
         plateau.selectionner(position, legauxSiDecouverte());
         poser(etaitCible ? 'bravo' : 'accueil');
-        if (r.effet === 'finie') await terminer(etat.finie ?? 'aidee', expliquee);
-        else if (demoDue(etat)) await montrer();
+        if (r.effet === 'finie') { await terminer(etat.finie ?? 'aidee', explication); return; }
+        if (explication) {
+            const ici = partie;
+            await explication;
+            if (ici !== partie || !vivant()) return;
+            occupe = false;
+        }
+        if (demoDue(etat)) await montrer();
     }
 
     /** Démonstration : jouée depuis la position courante, vers toutes les cibles restantes. */
@@ -161,14 +173,14 @@ export function renderJeu(root: HTMLElement): void {
         if (!p) return;
         occupe = true;
         p.selectionner(undefined);
-        p.eclairer(trajet(s, etat.atteintes, position));
+        p.eclairer(trajet(s, etat.atteintes, position, etat.prises));
         void dire('regarde');
         await attendre(mouvementReduit() ? 400 : PAS_DEMO_MS + 400);
         const reste = new Set(restantes(s, etat));
-        for (const q of solution(s, etat.atteintes, position)) {
+        for (const q of solution(s, etat.atteintes, position, etat.prises)) {
             if (!vivant()) return;
             const cible = reste.delete(q);
-            if (cible && s.pieces[q]?.startsWith('b')) p.prendre(q);
+            if (s.pieces[q]?.startsWith('b') && !etat.prises.includes(q)) p.prendre(q);
             p.deplacer(position, q);
             position = q;
             if (cible) { cibleAtteinte(q); p.viser([...reste]); }
@@ -176,11 +188,11 @@ export function renderJeu(root: HTMLElement): void {
         }
         p.eclairer([]);
         etat = demontrer(s, etat);
-        await terminer('aidee', false);
+        await terminer('aidee');
     }
 
     let bravo = 0;
-    async function terminer(statut: 'seule' | 'aidee', priseDite: boolean): Promise<void> {
+    async function terminer(statut: 'seule' | 'aidee', explication?: Promise<void>): Promise<void> {
         occupe = true;
         clearTimeout(minuterie);
         const save = readSave(storage);
@@ -193,7 +205,8 @@ export function renderJeu(root: HTMLElement): void {
         dessinerAvancee();
         poser('bravo');
         plateau?.element.classList.add('fete');
-        if (priseDite) await attendre(2600);
+        // La règle de la prise se dit jusqu'au bout avant le bravo.
+        if (explication) await explication;
         if (!vivant()) return;
         bravo = bravo % 3 + 1;
         await dire(`bravo.${bravo}`);
@@ -215,6 +228,7 @@ export function renderJeu(root: HTMLElement): void {
         bindAction(scene.querySelector<HTMLElement>('#continuer')!, () => {
             seance.debut = Date.now();
             seance.faites = 0;
+            priseExpliquee = false;
             commencer(suivante);
         }, 'jeu:continuer');
     }
@@ -229,6 +243,7 @@ export function renderJeu(root: HTMLElement): void {
         quitter();
         seance.debut = Date.now();
         seance.faites = 0;
+        priseExpliquee = false;
         go('accueil');
     }, 'jeu:retour');
     bindAction(root.querySelector<HTMLElement>('#ecouter')!, () => { reecouter(); relancer(); }, 'jeu:ecouter');

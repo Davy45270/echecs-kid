@@ -10,8 +10,8 @@ export interface Situation {
     /** Étoiles, ou cases de pièces adverses à prendre ; elles s'attrapent dans n'importe quel ordre. */
     cibles: string[];
     /**
-     * Solution de référence écrite à la main : les cases d'arrivée, coup après coup. Elle sert au tracé de l'aide 2
-     * et à la démonstration tant que l'enfant la suit ; tout autre coup légal reste accepté.
+     * Solution de référence écrite à la main : les cases d'arrivée, coup après coup, vérifiée légale et minimale par les
+     * tests. En jeu, tout coup légal est accepté ; l'aide et la démonstration se calculent depuis la position de la tour.
      */
     acceptes: string[];
     decouverte: boolean;

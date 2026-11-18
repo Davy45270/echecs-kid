@@ -39,6 +39,8 @@ export interface Rappels {
     actif(): boolean;
     /** Une pièce à soi vient d'être choisie. */
     choisie(k: string): void;
+    /** Cette pièce à soi peut-elle bouger ? Sinon, la toucher pendant qu'une autre est choisie est un coup vers elle. */
+    mobile(k: string): boolean;
     /** Un coup est tenté (toucher-toucher ou glisser). */
     coup(de: string, vers: string): void;
     /** Tout toucher, même ignoré (sert à la relance par inactivité). */
@@ -151,7 +153,8 @@ export function creerPlateau(s: Situation, c: number, rappels: Rappels): Plateau
         geste = { pointer: ev.pointerId, x: ev.clientX, y: ev.clientY, depart: k, glisse: false };
         if (aMoi(k)) {
             geste.piece = pieces.get(k);
-            if (k !== choisie) rappels.choisie(k);
+            // Une pièce à soi se re-choisit, sauf si elle est immobile alors qu'une autre est choisie.
+            if (k !== choisie && (choisie === undefined || rappels.mobile(k))) rappels.choisie(k);
         }
         // Capture à chaque appui principal : le relâcher revient au plateau même hors de lui.
         try { el.setPointerCapture(ev.pointerId); } catch { /* Capture facultative (pointeur synthétique). */ }
@@ -182,7 +185,12 @@ export function creerPlateau(s: Situation, c: number, rappels: Rappels): Plateau
             if (g.depart !== undefined && k !== undefined && k !== g.depart) rappels.coup(g.depart, k);
             return;
         }
-        if (k === undefined || k !== g.depart || aMoi(k)) return;
+        if (k === undefined || k !== g.depart) return;
+        if (aMoi(k)) {
+            // Toucher-toucher vers sa propre pièce immobile : même réponse que le glisser (« ne passe pas par-dessus »).
+            if (choisie !== undefined && k !== choisie && !rappels.mobile(k)) rappels.coup(choisie, k);
+            return;
+        }
         if (choisie !== undefined) rappels.coup(choisie, k);
         else inviter();
     });

@@ -128,9 +128,49 @@ test('dropping the rook on its own pawn says passe-pas and the rook goes back', 
     await page.mouse.up();
     await expect.poll(() => voix(page)).toContain('tour.passe-pas');
     await expect(tour(page)).toHaveAttribute('data-case', '0,0');
-    // Ni erreur ni verrou : le coup suivant est joué aussitôt.
+    // Toucher-toucher vers le pion : même réponse que le glisser, et le pion n'est pas choisi.
+    await page.evaluate(() => { (window as unknown as { __voix?: string[] }).__voix = []; });
     await toucher(page, info, '0,0');
+    await toucher(page, info, '0,3');
+    await expect.poll(() => voix(page)).toContain('tour.passe-pas');
+    await expect(tour(page)).toHaveAttribute('data-case', '0,0');
+    await expect(page.locator('.piece.choisie')).toHaveAttribute('data-case', '0,0');
+    // Ni erreur ni verrou : le coup suivant est joué aussitôt.
     await toucher(page, info, '4,0');
     await expect(tour(page)).toHaveAttribute('data-case', '4,0');
     expect(await voix(page)).not.toContain('tour.regle');
+});
+
+test('the capture rule is said to the end: touches wait, and bravo comes after', async ({ page }, info) => {
+    // Lecteur factice : prise.regle dure 3 s, les autres phrases 100 ms. Aucun son réel.
+    await page.addInitScript(() => {
+        class Faux extends EventTarget {
+            volume = 1; duration = Number.NaN;
+            constructor(public src: string) { super(); }
+            play(): Promise<void> {
+                setTimeout(() => this.dispatchEvent(new Event('ended')), this.src.includes('prise.regle') ? 3000 : 100);
+                return Promise.resolve();
+            }
+            pause(): void { this.dispatchEvent(new Event('pause')); }
+        }
+        (window as unknown as { Audio: unknown }).Audio = Faux;
+    });
+    await entrer(page, 4); // tour.train.5 : pion noir en 1,4, étoile en 4,4
+    await expect(page.locator('.plateau')).toHaveAttribute('data-situation', 'tour.train.5');
+    await toucher(page, info, '1,0');
+    await toucher(page, info, '1,4');
+    await expect(tour(page)).toHaveAttribute('data-case', '1,4');
+    await expect.poll(() => voix(page)).toContain('prise.regle');
+    // Pendant la phrase, les touchers sont ignorés.
+    await toucher(page, info, '1,4');
+    await toucher(page, info, '4,4');
+    await page.waitForTimeout(400);
+    await expect(tour(page)).toHaveAttribute('data-case', '1,4');
+    await page.waitForTimeout(3000);
+    await toucher(page, info, '1,4');
+    await toucher(page, info, '4,4');
+    await expect(tour(page)).toHaveAttribute('data-case', '4,4');
+    await expect.poll(async () => (await voix(page)).some(v => v.startsWith('bravo.'))).toBe(true);
+    const journal = await voix(page);
+    expect(journal.indexOf('prise.regle')).toBeLessThan(journal.findIndex(v => v.startsWith('bravo.')));
 });

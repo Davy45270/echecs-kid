@@ -12,3 +12,8 @@ npm test
 ```
 
 Outillage repris d'Opencadkid. Voir `AGENTS.md` pour les règles du dépôt.
+
+## Crédits
+
+- Voix : Piper, voix siwis (base SIWIS), licence [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- Code : licence MIT.
