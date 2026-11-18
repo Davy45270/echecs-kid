@@ -15,7 +15,7 @@ export default defineConfig({
             cacheId: 'echecs-kid',
             clientsClaim: true,
             cleanupOutdatedCaches: true,
-            globPatterns: ['**/*.{html,js,css,png,webmanifest}']
+            globPatterns: ['**/*.{html,js,css,png,webmanifest,ogg}']
         }
     })]
 });

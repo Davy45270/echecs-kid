@@ -26,6 +26,6 @@ it('uses a relative, complete precache with no runtime network caching', () => {
     const config = readFileSync('vite.config.ts', 'utf8');
     expect(config).toContain("base: './'");
     expect(config).toContain("strategies: 'generateSW'");
-    expect(config).toContain("globPatterns: ['**/*.{html,js,css,png,webmanifest}']");
+    expect(config).toContain("globPatterns: ['**/*.{html,js,css,png,webmanifest,ogg}']");
     expect(config).not.toContain('runtimeCaching');
 });
