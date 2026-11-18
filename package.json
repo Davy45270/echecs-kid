@@ -1,0 +1,33 @@
+{
+  "name": "echecs-kid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mes premiers échecs : une application pour apprendre les échecs aux petits.",
+  "license": "MIT",
+  "author": "David Sevin",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "check:precache": "node scripts/check-precache.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --max-warnings=0",
+    "test": "vitest run --pool=threads --maxWorkers=2",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "26.6.6",
+    "oxlint": "1.92.0",
+    "oxlint-tsgolint": "7.0.2006",
+    "typescript": "7.0.2",
+    "vite": "8.3.6",
+    "vite-plugin-pwa": "2.0.0",
+    "vitest": "5.1.0"
+  }
+}
