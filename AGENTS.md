@@ -1,7 +1,7 @@
 # Travailler sur « Mes premiers échecs »
 
-Guide pour tout agent de code (et tout humain) qui modifie ce dépôt. Les contraintes complètes sont dans
-`docs/superpowers/plans/2026-11-18-jalon-1-tour.md`, section « Global Constraints ». Outillage repris d'Opencadkid.
+Guide pour tout agent de code (et tout humain) qui modifie ce dépôt. Les contraintes qui suivent font foi ;
+la conception détaillée et les plans de travail sont tenus hors de ce dépôt. Outillage repris d'Opencadkid.
 
 ## Contraintes à respecter
 
