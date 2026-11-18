@@ -30,7 +30,7 @@ const DESSINS: Record<Kind, Dessin> = {
         signe: creux => signe('fente', `<path d="M45 24 L58 38" fill="none" stroke="${creux}" stroke-width="5.5" stroke-linecap="round"/>`)
             + '<circle class="piece" cx="50" cy="9" r="6"/>'
     },
-    // Dame : couronne à cinq pointes surmontées de billes.
+    // Dame : couronne à trois billes.
     Q: {
         corps: 'M31 80 Q39 63 41 50 Q29 46 28 36 L28 32 H72 V36 Q71 46 59 50 Q61 63 69 80 Z',
         signe: () => signe('couronne',
