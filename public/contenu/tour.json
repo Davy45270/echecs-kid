@@ -1,0 +1,25 @@
+{
+  "palier": "tour",
+  "situations": [
+    { "id": "tour.train.1", "jeu": "train", "taille": [4, 4], "pieces": { "0,0": "wR" }, "rochers": [],
+      "cibles": ["0,3"], "acceptes": [["0,3"]], "decouverte": true, "consigne": "train.consigne" },
+    { "id": "tour.train.2", "jeu": "train", "taille": [4, 4], "pieces": { "0,0": "wR" }, "rochers": [],
+      "cibles": ["3,0", "3,3"], "acceptes": [["3,0"], ["3,3"]], "decouverte": false, "consigne": "train.consigne" },
+    { "id": "tour.train.3", "jeu": "train", "taille": [5, 5], "pieces": { "0,2": "wR" }, "rochers": [],
+      "cibles": ["4,2", "4,0"], "acceptes": [["4,2"], ["4,0"]], "decouverte": false, "consigne": "train.consigne" },
+    { "id": "tour.train.4", "jeu": "train", "taille": [6, 6], "pieces": { "0,0": "wR" }, "rochers": [],
+      "cibles": ["0,5", "5,5", "5,2"], "acceptes": [["0,5"], ["5,5"], ["5,2"]], "decouverte": false, "consigne": "train.consigne" },
+    { "id": "tour.train.5", "jeu": "train", "taille": [6, 6], "pieces": { "1,0": "wR", "1,4": "bP" }, "rochers": [],
+      "cibles": ["1,4", "4,4"], "acceptes": [["1,4"], ["4,4"]], "decouverte": false, "consigne": "train.consigne" },
+    { "id": "tour.train.6", "jeu": "train", "taille": [6, 6], "pieces": { "0,0": "wR", "0,3": "wP" }, "rochers": [],
+      "cibles": ["4,0", "4,5"], "acceptes": [["4,0"], ["4,5"]], "decouverte": false, "consigne": "train.consigne" },
+    { "id": "tour.rochers.1", "jeu": "rochers", "taille": [6, 6], "pieces": { "0,0": "wR" }, "rochers": ["3,0"],
+      "cibles": ["5,2"], "acceptes": [["0,2"], ["5,2"]], "decouverte": false, "consigne": "rochers.consigne" },
+    { "id": "tour.rochers.2", "jeu": "rochers", "taille": [6, 6], "pieces": { "0,5": "wR" }, "rochers": ["0,2"],
+      "cibles": ["3,0"], "acceptes": [["3,5"], ["3,0"]], "decouverte": false, "consigne": "rochers.consigne" },
+    { "id": "tour.rochers.3", "jeu": "rochers", "taille": [6, 6], "pieces": { "5,0": "wR" }, "rochers": ["5,3"],
+      "cibles": ["1,5"], "acceptes": [["1,0"], ["1,5"]], "decouverte": false, "consigne": "rochers.consigne" },
+    { "id": "tour.rochers.4", "jeu": "rochers", "taille": [6, 6], "pieces": { "1,1": "wR" }, "rochers": ["1,3"],
+      "cibles": ["4,4"], "acceptes": [["4,1"], ["4,4"]], "decouverte": false, "consigne": "rochers.consigne" }
+  ]
+}
