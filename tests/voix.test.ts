@@ -35,7 +35,7 @@ afterEach(() => { vi.restoreAllMocks(); });
 
 it('every phrase has an audio file and a matching fingerprint', () => {
     const ids = Object.keys(phrases).sort();
-    expect(ids).toHaveLength(11);
+    expect(ids).toHaveLength(12);
     for (const id of ids) {
         expect(existsSync(`public/voix/${id}.ogg`), id).toBe(true);
         expect(empreintes[id], id).toMatch(/^[0-9a-f]{16}$/);
