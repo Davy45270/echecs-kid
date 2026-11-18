@@ -14,8 +14,8 @@ test.skip(!process.env.CAPTURES, 'CAPTURES=1 pour écrire les captures');
 
 test('captures des pièces et de la mascotte', async ({ page }) => {
     mkdirSync('docs/captures', { recursive: true });
-    await page.setContent(`${css}${page12(44)}<hr>${page12(56)}`);
-    await page.locator('body').screenshot({ path: 'docs/captures/pieces-mobile.png' });
-    await page.setContent(`${css}<div class="rang">${(['accueil', 'bravo', 'reflechit', 'baille'] as const).map(p => mascotteSvg(p, 120)).join('')}</div>`);
-    await page.locator('body').screenshot({ path: 'docs/captures/mascotte.png' });
+    await page.setContent(`${css}<div id="c">${page12(44)}<hr>${page12(56)}</div>`);
+    await page.locator('#c').screenshot({ path: 'docs/captures/pieces-mobile.png' });
+    await page.setContent(`${css}<div id="c"><div class="rang">${(['accueil', 'bravo', 'reflechit', 'baille'] as const).map(p => mascotteSvg(p, 120)).join('')}</div></div>`);
+    await page.locator('#c').screenshot({ path: 'docs/captures/mascotte.png' });
 });
