@@ -48,7 +48,6 @@ export interface Rappels {
 export interface Plateau {
     element: HTMLElement;
     redimensionner(c: number): void;
-    selection(): string | undefined;
     selectionner(k: string | undefined, legaux?: string[]): void;
     deplacer(de: string, vers: string): void;
     prendre(k: string): void;
@@ -152,8 +151,9 @@ export function creerPlateau(s: Situation, c: number, rappels: Rappels): Plateau
         if (aMoi(k)) {
             geste.piece = pieces.get(k);
             if (k !== choisie) rappels.choisie(k);
-            try { el.setPointerCapture(ev.pointerId); } catch { /* Capture facultative (pointeur synthétique). */ }
         }
+        // Capture à chaque appui principal : le relâcher revient au plateau même hors de lui.
+        try { el.setPointerCapture(ev.pointerId); } catch { /* Capture facultative (pointeur synthétique). */ }
         ev.preventDefault();
     });
     el.addEventListener('pointermove', ev => {
@@ -167,7 +167,10 @@ export function creerPlateau(s: Situation, c: number, rappels: Rappels): Plateau
         contour.hidden = k === undefined;
         if (k !== undefined) placer(contour, k);
     });
-    el.addEventListener('pointercancel', ev => { if (geste?.pointer === ev.pointerId) fin.finish(); });
+    // Filet : tout geste se termine au relâcher ou à l'annulation, où qu'ils arrivent (après le traitement du plateau).
+    const oublier = (ev: PointerEvent): void => { if (geste?.pointer === ev.pointerId) fin.finish(); };
+    el.ownerDocument.addEventListener('pointerup', oublier);
+    el.ownerDocument.addEventListener('pointercancel', oublier);
     el.addEventListener('pointerup', ev => {
         if (!geste || geste.pointer !== ev.pointerId) return;
         const g = geste;
@@ -191,7 +194,6 @@ export function creerPlateau(s: Situation, c: number, rappels: Rappels): Plateau
     return {
         element: el,
         redimensionner,
-        selection: () => choisie,
         selectionner,
         deplacer(de, vers) {
             const n = pieces.get(de);
@@ -220,6 +222,11 @@ export function creerPlateau(s: Situation, c: number, rappels: Rappels): Plateau
         secouer(k) { const n = pieces.get(k); if (n) rejouer(n, 'secoue'); },
         eclairer(liste) { for (const [ck, cell] of cases) cell.classList.toggle('trajet', liste.includes(ck)); },
         inviter,
-        detruire() { fin.dispose(); el.remove(); }
+        detruire() {
+            el.ownerDocument.removeEventListener('pointerup', oublier);
+            el.ownerDocument.removeEventListener('pointercancel', oublier);
+            fin.dispose();
+            el.remove();
+        }
     };
 }

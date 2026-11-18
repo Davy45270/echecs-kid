@@ -15,8 +15,9 @@ const INACTIVITE_MS = 8000;
 const PAS_DEMO_MS = 750;
 const PALIER = 'tour';
 
-// Séance : depuis l'ouverture de l'application, remise à zéro à chaque pause acceptée.
-const seance = { debut: undefined as number | undefined, faites: 0 };
+// Séance : remise à zéro à chaque entrée dans l'écran de jeu et à chaque pause acceptée ;
+// le temps passé sur l'accueil ne compte pas.
+const seance = { debut: 0, faites: 0 };
 let priseExpliquee = false;
 let generation = 0;
 
@@ -27,7 +28,8 @@ export function renderJeu(root: HTMLElement): void {
     const situations = situationsTour;
     const moi = ++generation;
     const vivant = (): boolean => moi === generation && root.isConnected && root.dataset.screen === 'jeu';
-    seance.debut ??= Date.now();
+    seance.debut = Date.now();
+    seance.faites = 0;
     const storage = browserStorage();
     const courante = readSave(storage).progress.courante[PALIER] ?? 0;
     let index = courante >= 0 && courante < situations.length ? courante : 0;
@@ -61,10 +63,10 @@ export function renderJeu(root: HTMLElement): void {
 
     const relancer = (): void => {
         clearTimeout(minuterie);
-        minuterie = setTimeout(() => { if (vivant() && !occupe) reecouter(); }, INACTIVITE_MS);
+        minuterie = setTimeout(() => { if (vivant() && !occupe) void dire(s.consigne); }, INACTIVITE_MS);
     };
     const taille = (): number => taillesCase(window.innerWidth, window.innerHeight, Math.max(...s.taille));
-    const surRedim = (): void => { if (vivant()) plateau?.redimensionner(taille()); else window.removeEventListener('resize', surRedim); };
+    const surRedim = (): void => { if (vivant()) plateau?.redimensionner(taille()); else quitter(); };
     window.addEventListener('resize', surRedim);
 
     const dessinerAvancee = (): void => {
@@ -105,9 +107,10 @@ export function renderJeu(root: HTMLElement): void {
     };
 
     async function tenter(de: string, vers: string): Promise<void> {
-        if (!plateau) return;
+        // Seule la tour se déplace : un geste parti d'une autre pièce n'est pas un coup.
+        if (!plateau || de !== position) return;
         const avant = position;
-        const r = jouer(s, etat, de, vers, Date.now());
+        const r = jouer(s, etat, avant, vers, Date.now());
         if (r.effet === 'ignore') return;
         etat = r.etat;
         if (r.effet === 'erreur-regle' || r.effet === 'erreur-but') {
@@ -177,7 +180,7 @@ export function renderJeu(root: HTMLElement): void {
         await dire(`bravo.${bravo}`);
         await attendre(500);
         if (!vivant()) return;
-        if (pauseDue(seance.faites, seance.debut ?? Date.now(), Date.now())) pause(suivante);
+        if (pauseDue(seance.faites, seance.debut, Date.now())) pause(suivante);
         else commencer(suivante);
     }
 
@@ -197,12 +200,19 @@ export function renderJeu(root: HTMLElement): void {
         }, 'jeu:continuer');
     }
 
-    bindAction(root.querySelector<HTMLElement>('#retour')!, () => {
+    function quitter(): void {
         clearTimeout(minuterie);
+        window.removeEventListener('resize', surRedim);
         plateau?.detruire();
+        plateau = undefined;
+    }
+    bindAction(root.querySelector<HTMLElement>('#retour')!, () => {
+        quitter();
+        seance.debut = Date.now();
+        seance.faites = 0;
         go('accueil');
     }, 'jeu:retour');
-    bindAction(root.querySelector<HTMLElement>('#ecouter')!, () => { void dire(s.consigne); relancer(); }, 'jeu:ecouter');
+    bindAction(root.querySelector<HTMLElement>('#ecouter')!, () => { reecouter(); relancer(); }, 'jeu:ecouter');
 
     commencer(index);
 }

@@ -88,3 +88,17 @@ test('dragging the rook onto the star also plays the move', async ({ page }) => 
     await expect(tour(page)).toHaveAttribute('data-case', '0,3');
     await expect.poll(() => voix(page)).toContain('bravo.1');
 });
+
+test('a press released off the board does not freeze it', async ({ page }, info) => {
+    await entrer(page);
+    const vide = (await page.locator('.case[data-case="2,1"]').boundingBox())!;
+    const plateau = (await page.locator('.plateau').boundingBox())!;
+    await page.mouse.move(vide.x + vide.width / 2, vide.y + vide.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(plateau.x + plateau.width / 2, plateau.y + plateau.height + 60, { steps: 5 });
+    await page.mouse.up();
+    await toucher(page, info, '0,0');
+    await toucher(page, info, '0,3');
+    await expect(tour(page)).toHaveAttribute('data-case', '0,3');
+    await expect.poll(() => voix(page)).toContain('bravo.1');
+});
