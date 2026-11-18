@@ -9,15 +9,17 @@ const empreintes = JSON.parse(readFileSync('scripts/voix/empreintes.json', 'utf8
 type Ecouteur = () => void;
 class FauxAudio {
     static instances: FauxAudio[] = [];
-    static mode: 'fin' | 'erreur' = 'fin';
+    static mode: 'fin' | 'erreur' | 'muet' = 'fin';
     volume = 1;
     ecouteurs: Record<string, Ecouteur[]> = {};
     constructor(public src: string) { FauxAudio.instances.push(this); }
+    duration = Number.NaN;
     addEventListener(nom: string, f: Ecouteur) { (this.ecouteurs[nom] ??= []).push(f); }
+    removeEventListener(nom: string, f: Ecouteur) { this.ecouteurs[nom] = (this.ecouteurs[nom] ?? []).filter(g => g !== f); }
     emettre(nom: string) { for (const f of this.ecouteurs[nom] ?? []) f(); }
     pause() { this.emettre('pause'); }
     play() {
-        queueMicrotask(() => this.emettre(FauxAudio.mode === 'erreur' ? 'error' : 'ended'));
+        if (FauxAudio.mode !== 'muet') queueMicrotask(() => this.emettre(FauxAudio.mode === 'erreur' ? 'error' : 'ended'));
         return Promise.resolve();
     }
 }
@@ -71,4 +73,26 @@ it('reecouter replays the last instruction', async () => {
     await dire('train.consigne');
     reecouter();
     expect(FauxAudio.instances.map(a => a.src)).toEqual(['voix/train.consigne.ogg', 'voix/train.consigne.ogg']);
+});
+it('dire resolves after a fallback delay when the audio never signals its end', async () => {
+    vi.useFakeTimers();
+    try {
+        FauxAudio.mode = 'muet';
+        let fini = false;
+        void dire('regarde').then(() => { fini = true; });
+        await vi.advanceTimersByTimeAsync(7999);
+        expect(fini).toBe(false);
+        await vi.advanceTimersByTimeAsync(2);
+        expect(fini).toBe(true);
+        // Durée connue : délai = durée + 1,5 s.
+        fini = false;
+        void dire('bravo.1').then(() => { fini = true; });
+        const audio = FauxAudio.instances.at(-1)!;
+        audio.duration = 1;
+        audio.emettre('loadedmetadata');
+        await vi.advanceTimersByTimeAsync(2499);
+        expect(fini).toBe(false);
+        await vi.advanceTimersByTimeAsync(2);
+        expect(fini).toBe(true);
+    } finally { vi.useRealTimers(); }
 });
