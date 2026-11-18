@@ -19,10 +19,10 @@
     "test": "vitest run --pool=threads --maxWorkers=2",
     "test:e2e": "playwright test"
   },
-  "dependencies": {},
   "devDependencies": {
     "@playwright/test": "1.65.0",
     "@types/node": "26.6.6",
+    "happy-dom": "21.0.4",
     "oxlint": "1.92.0",
     "oxlint-tsgolint": "7.0.2006",
     "typescript": "7.0.2",
