@@ -102,3 +102,35 @@ test('a press released off the board does not freeze it', async ({ page }, info)
     await expect(tour(page)).toHaveAttribute('data-case', '0,3');
     await expect.poll(() => voix(page)).toContain('bravo.1');
 });
+
+test('a legal detour is played, never refused', async ({ page }, info) => {
+    await entrer(page);
+    await toucher(page, info, '0,0');
+    await toucher(page, info, '1,0');
+    await expect(tour(page)).toHaveAttribute('data-case', '1,0');
+    await toucher(page, info, '1,3');
+    await expect(tour(page)).toHaveAttribute('data-case', '1,3');
+    await toucher(page, info, '0,3');
+    await expect(tour(page)).toHaveAttribute('data-case', '0,3');
+    await expect.poll(() => voix(page)).toContain('bravo.1');
+    expect(await voix(page)).not.toContain('tour.regle');
+    await expect.poll(async () => (await progres(page))?.seule['tour.train.1']).toBe(1);
+});
+
+test('dropping the rook on its own pawn says passe-pas and the rook goes back', async ({ page }, info) => {
+    await entrer(page, 5); // tour.train.6 : pion blanc en 0,3
+    await expect(page.locator('.plateau')).toHaveAttribute('data-situation', 'tour.train.6');
+    const de = (await page.locator('.case[data-case="0,0"]').boundingBox())!;
+    const vers = (await page.locator('.case[data-case="0,3"]').boundingBox())!;
+    await page.mouse.move(de.x + de.width / 2, de.y + de.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(vers.x + vers.width / 2, vers.y + vers.height / 2, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(() => voix(page)).toContain('tour.passe-pas');
+    await expect(tour(page)).toHaveAttribute('data-case', '0,0');
+    // Ni erreur ni verrou : le coup suivant est joué aussitôt.
+    await toucher(page, info, '0,0');
+    await toucher(page, info, '4,0');
+    await expect(tour(page)).toHaveAttribute('data-case', '4,0');
+    expect(await voix(page)).not.toContain('tour.regle');
+});

@@ -10,45 +10,51 @@ import { key, type Board, type Square } from '../src/engine/types';
 const phrases = JSON.parse(readFileSync('public/voix/phrases.json', 'utf8')) as Record<string, string>;
 const sq = (k: string): Square => { const [file, rank] = k.split(',').map(Number); return { file: file!, rank: rank! }; };
 
-// Référence indépendante de src/jeu : le plateau après j cibles atteintes, la tour posée sur `tour`.
-function plateau(s: Situation, j: number, tour: string): Board {
+// Référence indépendante de src/jeu : le plateau, les cibles `prises` retirées, la tour posée sur `tour`.
+function plateau(s: Situation, prises: string[], tour: string): Board {
     const depart = Object.keys(s.pieces).find(k => s.pieces[k] === 'wR')!;
     const layout: Record<string, string> = {};
-    for (const [k, p] of Object.entries(s.pieces)) if (k !== depart && !s.cibles.slice(0, j).includes(k)) layout[k] = p;
+    for (const [k, p] of Object.entries(s.pieces)) if (k !== depart && !prises.includes(k)) layout[k] = p;
     layout[tour] = 'wR';
     return fromLayout(s.taille[0], s.taille[1], layout, s.rochers);
 }
-const coups = (s: Situation, j: number, de: string): string[] => slidingMoves(plateau(s, j, de), sq(de)).map(key);
+const coups = (s: Situation, prises: string[], de: string): string[] => slidingMoves(plateau(s, prises, de), sq(de)).map(key);
 
-/** Nombre minimal de coups de la tour pour aller de `de` à la cible j (BFS sur le moteur). */
-function distance(s: Situation, j: number, de: string): number {
-    const cible = s.cibles[j]!;
+/** Nombre minimal de coups de la tour pour aller de `de` à `cible`, les `prises` retirées (BFS sur le moteur). */
+function distance(s: Situation, prises: string[], de: string, cible: string): number {
     let front = [de]; const vus = new Set(front);
     for (let d = 0; front.length; d++) {
         if (front.includes(cible)) return d;
         const suivant: string[] = [];
-        for (const p of front) for (const q of coups(s, j, p)) if (!vus.has(q)) { vus.add(q); suivant.push(q); }
+        for (const p of front) for (const q of coups(s, prises, p)) if (!vus.has(q)) { vus.add(q); suivant.push(q); }
         front = suivant;
     }
     return Infinity;
 }
 
-/** Pour chaque coup, les cases légales d'où la cible suivante reste atteignable dans le nombre de coups restant. */
-function attendus(s: Situation): string[][] {
-    const out: string[][] = [];
-    let positions = [Object.keys(s.pieces).find(k => s.pieces[k] === 'wR')!];
-    for (let j = 0; j < s.cibles.length; j++) {
-        let reste = distance(s, j, positions[0]!);
-        while (reste > 0) {
-            const ok = new Set<string>();
-            for (const p of positions) for (const q of coups(s, j, p)) if (distance(s, j, q) <= reste - 1) ok.add(q);
-            out.push([...ok].sort());
-            positions = [...ok];
-            reste--;
-        }
-        positions = [s.cibles[j]!];
+const ordres = (xs: string[]): string[][] => xs.length <= 1 ? [xs] : xs.flatMap((x, i) => ordres(xs.filter((_, j) => j !== i)).map(o => [x, ...o]));
+
+/** Longueur minimale d'une partie qui attrape toutes les cibles, sur tous les ordres possibles. */
+function minimum(s: Situation): number {
+    const depart = Object.keys(s.pieces).find(k => s.pieces[k] === 'wR')!;
+    return Math.min(...ordres(s.cibles).map(ordre => {
+        let total = 0, pos = depart;
+        const prises: string[] = [];
+        for (const c of ordre) { total += distance(s, prises, pos, c); prises.push(c); pos = c; }
+        return total;
+    }));
+}
+
+/** Rejoue la solution de référence sur le moteur : chaque coup légal, et les cibles attrapées. */
+function rejouer(s: Situation): { legale: boolean; prises: string[] } {
+    let pos = Object.keys(s.pieces).find(k => s.pieces[k] === 'wR')!;
+    const prises: string[] = [];
+    for (const q of s.acceptes) {
+        if (!coups(s, prises, pos).includes(q)) return { legale: false, prises };
+        if (s.cibles.includes(q) && !prises.includes(q)) prises.push(q);
+        pos = q;
     }
-    return out;
+    return { legale: true, prises };
 }
 
 describe('catalogue du palier Tour', () => {
@@ -57,19 +63,27 @@ describe('catalogue du palier Tour', () => {
         expect(situationsTour.filter(s => s.decouverte).map(s => s.id)).toEqual(['tour.train.1']);
         for (const s of situationsTour) {
             expect(phrases[s.consigne], s.id).toBeTypeOf('string');
+            // Une pièce adverse à prendre : la consigne le dit (pas « l'étoile »).
+            const prendre = s.cibles.some(c => s.pieces[c]?.startsWith('b'));
+            if (s.jeu === 'train') expect(s.consigne, s.id).toBe(prendre ? 'prise.consigne' : 'train.consigne');
             if (s.jeu === 'rochers') { expect(s.taille).toEqual([6, 6]); expect(s.rochers).toHaveLength(1); expect(s.acceptes).toHaveLength(2); }
         }
     });
 
-    it('hand-written accepted squares equal engine moves that reach the next target', () => {
-        for (const s of situationsTour) expect(s.acceptes.map(a => [...a].sort()), s.id).toEqual(attendus(s));
+    it('the hand-written reference solution is legal, collects every target and is minimal', () => {
+        for (const s of situationsTour) {
+            const r = rejouer(s);
+            expect(r.legale, s.id).toBe(true);
+            expect([...r.prises].sort(), s.id).toEqual([...s.cibles].sort());
+            expect(s.acceptes.length, s.id).toBe(minimum(s));
+        }
     });
 
     it('every situation is solvable', () => {
         for (const s of situationsTour) {
             let e = etatInitial();
             let pos = Object.keys(s.pieces).find(k => s.pieces[k] === 'wR')!;
-            for (const vers of solution(s, 0, pos)) {
+            for (const vers of solution(s, [], pos)) {
                 const r = jouer(s, e, pos, vers, 0);
                 expect(['avance', 'prise', 'finie'], s.id).toContain(r.effet);
                 e = r.etat; pos = vers;
@@ -81,7 +95,7 @@ describe('catalogue du palier Tour', () => {
     it('no situation needs more than 3 moves', () => {
         for (const s of situationsTour) {
             expect(s.acceptes.length, s.id).toBeLessThanOrEqual(3);
-            expect(attendus(s).length, s.id).toBe(s.acceptes.length);
+            expect(minimum(s), s.id).toBe(s.acceptes.length);
         }
     });
 

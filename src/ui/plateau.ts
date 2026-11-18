@@ -52,7 +52,8 @@ export interface Plateau {
     deplacer(de: string, vers: string): void;
     prendre(k: string): void;
     cueillir(k: string): void;
-    viser(k: string | undefined): void;
+    /** Les cibles qui restent : toutes brillent, l'ordre est libre. */
+    viser(restantes: string[]): void;
     secouer(k: string): void;
     eclairer(cases: string[]): void;
     inviter(): void;
@@ -101,12 +102,12 @@ export function creerPlateau(s: Situation, c: number, rappels: Rappels): Plateau
         if (s.pieces[k] === undefined) etoiles.set(k, couche('etoile', k, etoileSvg(100), 'Étoile'));
         else anneaux.set(k, couche('anneau', k, '', 'Cible'));
     }
-    /** La prochaine cible brille ; les suivantes attendent, plus petites. */
-    const viser = (k: string | undefined): void => {
-        for (const [ck, n] of etoiles) n.classList.toggle('visee', ck === k);
-        for (const [ck, n] of anneaux) n.hidden = ck !== k;
+    /** Toutes les cibles restantes brillent : elles s'attrapent dans n'importe quel ordre. */
+    const viser = (restantes: string[]): void => {
+        for (const [ck, n] of etoiles) n.classList.toggle('visee', restantes.includes(ck));
+        for (const [ck, n] of anneaux) n.hidden = !restantes.includes(ck);
     };
-    viser(s.cibles[0]);
+    viser(s.cibles);
     const pieces = new Map<string, HTMLElement>();
     for (const [k, code] of Object.entries(s.pieces)) {
         const piece = { color: code.charAt(0) as Color, kind: code.charAt(1) as Kind };

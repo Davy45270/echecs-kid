@@ -1,7 +1,9 @@
 // Écran de jeu du palier Tour : enchaîne les situations du gabarit Deplacer, l'aide graduée et la pause.
 // Aucun texte visible : tout passe par la voix, les icônes et les aria-label.
 import { situationsTour, type Situation } from '../content/situations';
-import { cibleCourante, coupsLegaux, demontrer, depart, etatInitial, jouer, pauseDue, raisonRegle, solution, trajet, type Etat } from '../jeu/deplacer';
+import {
+    coupsLegaux, demoDue, demontrer, depart, ERRANCE_TRAJET, etatInitial, jouer, pauseDue, raisonRegle, restantes, solution, trajet, trajetProche, type Etat
+} from '../jeu/deplacer';
 import { mascotteSvg, type Pose } from '../art/mascotte';
 import { bindAction } from '../shell/activation';
 import { go } from '../shell/router';
@@ -77,7 +79,7 @@ export function renderJeu(root: HTMLElement): void {
         }).join('');
     };
 
-    const legauxSiDecouverte = (): string[] => s.decouverte ? coupsLegaux(s, etat.coup, position) : [];
+    const legauxSiDecouverte = (): string[] => s.decouverte ? coupsLegaux(s, etat.atteintes, position) : [];
 
     const commencer = (i: number): void => {
         index = i;
@@ -106,25 +108,38 @@ export function renderJeu(root: HTMLElement): void {
         chime(true);
     };
 
+    /** Le chemin éclairé : après 3 coups d'errance, vers la cible la plus proche ; à l'aide 2, le trajet conseillé. */
+    const eclairage = (): string[] => {
+        if (etat.finie !== null) return [];
+        if (etat.errance >= ERRANCE_TRAJET) return trajetProche(s, etat.atteintes, position);
+        return etat.aide >= 2 ? trajet(s, etat.atteintes, position) : [];
+    };
+
     async function tenter(de: string, vers: string): Promise<void> {
         // Seule la tour se déplace : un geste parti d'une autre pièce n'est pas un coup.
         if (!plateau || de !== position) return;
         const avant = position;
+        const avantes = etat.atteintes.length;
         const r = jouer(s, etat, avant, vers, Date.now());
         if (r.effet === 'ignore') return;
         etat = r.etat;
-        if (r.effet === 'erreur-regle' || r.effet === 'erreur-but') {
-            plateau.secouer(avant);
-            poser('reflechit');
-            if (etat.aide === 3) { await montrer(); return; }
-            void dire(r.effet === 'erreur-regle' ? raisonRegle(s, etat.coup, avant, vers) : s.consigne);
-            if (etat.aide === 2) plateau.eclairer(trajet(s, etat.coup, position));
+        if (r.effet === 'passe-pas') {
+            // Tour posée sur sa propre pièce : elle revient, sans erreur ni verrou.
+            void dire('tour.passe-pas');
             return;
         }
-        // Coup accepté.
-        const etaitCible = s.cibles.includes(vers);
+        if (r.effet === 'erreur-regle') {
+            plateau.secouer(avant);
+            poser('reflechit');
+            if (demoDue(etat)) { await montrer(); return; }
+            void dire(raisonRegle(s, etat.atteintes, avant, vers));
+            plateau.eclairer(eclairage());
+            return;
+        }
+        // Coup légal : toujours joué.
+        const etaitCible = etat.atteintes.length > avantes;
         let expliquee = false;
-        if (s.pieces[vers]?.startsWith('b')) {
+        if (etaitCible && s.pieces[vers]?.startsWith('b')) {
             plateau.prendre(vers);
             // R4 : la première prise de la séance s'explique.
             if (!priseExpliquee) { priseExpliquee = true; expliquee = true; void dire('prise.regle'); }
@@ -132,27 +147,31 @@ export function renderJeu(root: HTMLElement): void {
         plateau.deplacer(avant, vers);
         position = vers;
         if (etaitCible) cibleAtteinte(vers);
-        plateau.eclairer(etat.aide >= 2 && r.effet !== 'finie' ? trajet(s, etat.coup, position) : []);
-        plateau.viser(s.cibles[cibleCourante(s, etat.coup)]);
+        plateau.eclairer(eclairage());
+        plateau.viser(restantes(s, etat));
         plateau.selectionner(position, legauxSiDecouverte());
         poser(etaitCible ? 'bravo' : 'accueil');
         if (r.effet === 'finie') await terminer(etat.finie ?? 'aidee', expliquee);
+        else if (demoDue(etat)) await montrer();
     }
 
+    /** Démonstration : jouée depuis la position courante, vers toutes les cibles restantes. */
     async function montrer(): Promise<void> {
         const p = plateau;
         if (!p) return;
         occupe = true;
         p.selectionner(undefined);
-        p.eclairer(trajet(s, etat.coup, position));
+        p.eclairer(trajet(s, etat.atteintes, position));
         void dire('regarde');
         await attendre(mouvementReduit() ? 400 : PAS_DEMO_MS + 400);
-        for (const q of solution(s, etat.coup, position)) {
+        const reste = new Set(restantes(s, etat));
+        for (const q of solution(s, etat.atteintes, position)) {
             if (!vivant()) return;
-            if (s.pieces[q]?.startsWith('b')) p.prendre(q);
+            const cible = reste.delete(q);
+            if (cible && s.pieces[q]?.startsWith('b')) p.prendre(q);
             p.deplacer(position, q);
             position = q;
-            if (s.cibles.includes(q)) cibleAtteinte(q);
+            if (cible) { cibleAtteinte(q); p.viser([...reste]); }
             await attendre(PAS_DEMO_MS);
         }
         p.eclairer([]);
