@@ -5,6 +5,11 @@ import { browserStorage, fresh, readSave, writeSave } from '../shell/storage';
 import { checkParental, parentalQuestion } from '../shell/parental';
 import { regler } from '../shell/voix';
 
+const VERROU_MS = 5000;
+let verrouJusqu = 0;
+/** Après une mauvaise réponse, le bouton parent reste inerte 5 s. */
+export function parentVerrouille(): boolean { return Date.now() < verrouJusqu; }
+
 const compter = (m: Record<string, number>, prefixe: string): number => Object.keys(m).filter(k => k.startsWith(prefixe)).length;
 
 /** Question d'adulte (une multiplication) avant d'ouvrir les réglages. */
@@ -14,7 +19,7 @@ export function gate(root: HTMLElement): void {
         + `<div class="reponses">${question.choices.map(n => `<button data-choix="${n}">${n}</button>`).join('')}</div>`
         + `<button id="fermer">Fermer</button></section>`;
     root.querySelectorAll<HTMLElement>('[data-choix]').forEach(b => bindAction(b, () => {
-        if (checkParental(question, Number(b.dataset.choix))) reglages(root); else go('accueil');
+        if (checkParental(question, Number(b.dataset.choix))) reglages(root); else { verrouJusqu = Date.now() + VERROU_MS; go('accueil'); }
     }, `parent:choix:${b.dataset.choix}`));
     bindAction(root.querySelector<HTMLElement>('#fermer')!, () => go('accueil'), 'parent:fermer');
 }

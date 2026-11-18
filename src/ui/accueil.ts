@@ -5,6 +5,7 @@ import { go } from '../shell/router';
 import { bindAction } from '../shell/activation';
 import { unlockSound } from '../shell/sound';
 import { dire } from '../shell/voix';
+import { parentVerrouille } from './parent';
 import { iconeRouage } from './icones';
 
 let salue = false;
@@ -27,6 +28,6 @@ export function renderAccueil(root: HTMLElement): void {
         + `<button class="carte" id="tour" aria-label="Tour">${pieceSvg({ color: 'w', kind: 'R' }, 160)}</button>`
         + `</section>`;
     bindAction(root.querySelector<HTMLElement>('#tour')!, () => go('jeu', 'tour'), 'accueil:tour');
-    bindAction(root.querySelector<HTMLElement>('#parent')!, () => go('parent'), 'accueil:parent');
+    bindAction(root.querySelector<HTMLElement>('#parent')!, () => { if (!parentVerrouille()) go('parent'); }, 'accueil:parent');
     armerSalutation();
 }

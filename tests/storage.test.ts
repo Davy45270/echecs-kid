@@ -7,6 +7,10 @@ it('corrupt or obsolete save returns fresh', () => {
     const blocked = { getItem: (): null => { throw new Error('blocked'); }, setItem: (): void => { throw new Error('full'); } };
     expect(readSave(blocked)).toEqual(fresh()); expect(() => writeSave(blocked, fresh())).not.toThrow();
 });
+it('version check rejects otherwise valid saves', () => {
+    expect(readSave(port(JSON.stringify({ ...fresh(), version: 2, volume: 0.5 })))).toEqual(fresh());
+    expect(readSave(port(JSON.stringify({ ...fresh(), version: '1', volume: 0.5 })))).toEqual(fresh());
+});
 it('volume is clamped on read', () => {
     const at = (volume: number) => readSave(port(JSON.stringify({ ...fresh(), volume }))).volume;
     expect(at(0)).toBe(0.3); expect(at(-4)).toBe(0.3); expect(at(7)).toBe(1); expect(at(0.6)).toBe(0.6);
